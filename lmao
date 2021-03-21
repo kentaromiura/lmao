@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+const orky = require('child_process'); // the orchestrator
+const CWD = process.cwd();
+const fs = require('fs');
+const maybeExecSync = (cmd) => {
+	try {
+		return orky.execSync(cmd, {cwd: CWD});
+	} catch(e) {
+		return null;
+	}
+};
+
+if (!CWD.includes('/usr/ports')) {
+	console.log('You need to run this inside a port (in /usr/ports).');
+	return;
+}
+
+if(process.getuid() !== 0) {
+	console.log('You need elevated priviledge to run this');
+	console.log('Elevating:');
+	return maybeExecSync(`sudo ${__filename}`);
+};
+
+const maybePortMaster = '' + maybeExecSync(`which portmaster`);
+if (maybePortMaster == 'null') {
+	console.log("Installing portmaster");
+	maybeExecSync("pkg install portmaster");
+}
+
+const child = orky.exec('mktemp', (error, stdout, stderr) => {
+	const tmpFile = stdout.trimEnd();
+	orky.execSync(`make all-depends-list > ${tmpFile}`);
+	fs.readFileSync(tmpFile, 'utf8').split('\n').forEach(dep => {
+		console.log(dep);
+		try {
+				dep && child_process.execSync(`pkg install ${dep.substring(dep.lastIndexOf('/') + 1)}`);
+		} catch(e) {};
+	});
+	fs.unlinkSync(tmpFile);
+	return maybeExecSync("portmaster .");
+});
